@@ -1,0 +1,225 @@
+---
+title: "testsolve"
+author: "srihari"
+date: "11 October 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Integer Programming
+
+Objective Function
+max: 8 x1 + 5 x2;
+
+Constraints:
+x1 + x2 <= 6;
+9 x1 + 5 x2 <= 45;
+
+#### Read file
+
+```{r}
+library(lpSolveAPI)
+x <- read.lp("oct8.n1.lp")
+```
+
+
+
+### Solve the problem
+
+```{r}
+solve(x)
+get.objective(x)
+rsp1<-get.variables(x)
+rsp1
+```
+
+```{r}
+sp2 <- make.lp(0, 2) # number of constraints, number of decision variables
+set.objfn(sp2, c(-8, -5))
+add.constraint(sp2, c(1, 1), "<=", 6)
+add.constraint(sp2, c(9, 5), "<=", 45)
+add.constraint(sp2,c(1,0),">=",4)
+```
+```{r}
+solve(sp2)
+get.objective(sp2)
+rsp2<-get.variables(sp2)
+rsp2
+```
+
+```{r}
+# SP 4 = SP 2 + x2 >= 2
+sp4 <- make.lp(0, 2) # number of constraints, number of decision variables
+set.objfn(sp4, c(-8, -5))
+add.constraint(sp4, c(1, 1), "<=", 6)
+add.constraint(sp4, c(9, 5), "<=", 45)
+add.constraint(sp4,c(1,0),">=",4)
+add.constraint(sp4,c(0,1),">=",2)
+```
+```{r}
+solve(sp4)
+get.objective(sp4)
+rsp4<-get.variables(sp4)
+rsp4
+```
+```{r}
+# SP 5 = SP 2 + x2 <= 1
+sp5 <- make.lp(0, 2) # number of constraints, number of decision variables
+set.objfn(sp5, c(-8, -5))
+add.constraint(sp5, c(1, 1), "<=", 6)
+add.constraint(sp5, c(9, 5), "<=", 45)
+add.constraint(sp5,c(1,0),">=",4)
+add.constraint(sp5,c(0,1),"<=",1)
+```
+```{r}
+solve(sp5)
+get.objective(sp5)
+rsp5<-get.variables(sp5)
+rsp5
+```
+```{r}
+# SP 6 = SP 5 + x1 >= 5
+sp6 <- make.lp(0, 2) # number of constraints, number of decision variables
+set.objfn(sp6, c(-8, -5))
+add.constraint(sp6, c(1, 1), "<=", 6)
+add.constraint(sp6, c(9, 5), "<=", 45)
+add.constraint(sp6,c(1,0),">=",5)
+add.constraint(sp6,c(0,1),"<=",1)
+```
+```{r}
+solve(sp6)
+get.objective(sp6)
+rsp6<-get.variables(sp6)
+rsp6
+```
+```{r}
+# SP 7 = SP 5 + x1 <= 4
+sp7 <- make.lp(0, 2) # number of constraints, number of decision variables
+set.objfn(sp7, c(-8, -5))
+add.constraint(sp7, c(1, 1), "<=", 6)
+add.constraint(sp7, c(9, 5), "<=", 45)
+add.constraint(sp7,c(1,0),"=",4)
+add.constraint(sp7,c(0,1),"<=",1)
+```
+```{r}
+solve(sp7)
+get.objective(sp7)
+rsp7<-get.variables(sp7)
+rsp7
+```
+```{r}
+sp3 <- make.lp(0, 2) # number of constraints, number of decision variables
+set.objfn(sp3, c(-8, -5))
+add.constraint(sp3, c(1, 1), "<=", 6)
+add.constraint(sp3, c(9, 5), "<=", 45)
+add.constraint(sp3,c(0,1),">=",3)
+```
+```{r}
+solve(sp3)
+get.objective(sp3)
+rsp3<-get.variables(sp3)
+rsp3
+```
+
+```{r}
+sp8 <- make.lp(0, 2) # number of constraints, number of decision variables
+set.objfn(sp8, c(-8, -5))
+add.constraint(sp8, c(1, 1), "<=", 6)
+add.constraint(sp8, c(9, 5), "<=", 45)
+add.constraint(sp8,c(0,1),"<=",2)
+```
+```{r}
+solve(sp8)
+get.objective(sp8)
+rsp8<-get.variables(sp8)
+rsp8
+```
+```{r}
+sp10 <- make.lp(0, 2) # number of constraints, number of decision variables
+set.objfn(sp10, c(-8, -5))
+add.constraint(sp10, c(1, 1), "<=", 6)
+add.constraint(sp10, c(9, 5), "<=", 45)
+add.constraint(sp10,c(1,0),"<=",3)
+add.constraint(sp10,c(0,1),"<=",2)
+```
+```{r}
+solve(sp10)
+get.objective(sp10)
+rsp10<-get.variables(sp10)
+rsp10
+```
+```{r}
+sp9 <- make.lp(0, 2) # number of constraints, number of decision variables
+set.objfn(sp9, c(-8, -5))
+add.constraint(sp9, c(1, 1), "<=", 6)
+add.constraint(sp9, c(9, 5), "<=", 45)
+add.constraint(sp9,c(1,0),">=",4)
+add.constraint(sp9,c(0,1),"<=",2)
+```
+```{r}
+solve(sp9)
+get.objective(sp9)
+rsp9<-get.variables(sp9)
+rsp9
+```
+```{r}
+sp11 <- make.lp(0, 2) # number of constraints, number of decision variables
+set.objfn(sp11, c(-8, -5))
+add.constraint(sp11, c(1, 1), "<=", 6)
+add.constraint(sp11, c(9, 5), "<=", 45)
+add.constraint(sp11,c(1,0),">=",4)
+add.constraint(sp11,c(0,1),">=",2)
+```
+```{r}
+solve(sp11)
+get.objective(sp11)
+rsp11<-get.variables(sp11)
+rsp11
+```
+
+```{r}
+sp12 <- make.lp(0, 2) # number of constraints, number of decision variables
+set.objfn(sp12, c(-8, -5))
+add.constraint(sp12, c(1, 1), "<=", 6)
+add.constraint(sp12, c(9, 5), "<=", 45)
+add.constraint(sp12,c(1,0),">=",4)
+add.constraint(sp12,c(0,1),"<=",1)
+```
+```{r}
+solve(sp12)
+get.objective(sp12)
+rsp12<-get.variables(sp12)
+rsp12
+```
+
+
+
+### Print the solution
+
+```{r}
+library(lpSolveAPI)
+rsp1
+rsp2
+rsp3
+rsp4
+rsp5
+rsp6
+rsp7
+rsp8
+rsp9
+rsp10
+rsp11
+rsp12
+x1<-c(3.75,3,4,4.44,4,5,3.88,3,3.88,4,4)
+x2<-c(2.25,3,1.8,1.8,1,0,2,3,2,1.8,1.8)
+z<-c(41.25,39,41,40.5,37,40,41.11,39,34,41,40.55)
+plot(x1,x2,col="blue", pch=19, cex=2)
+text(x1,x2, labels=0:25, pos=3)
+points(x=3,y=3,col="red",pch=19, cex=2)
+points(x=4,y=1,col="red",pch=19, cex=2)
+points(x=3,y=2,col="red",pch=19, cex=2)
+points(x=5,y=0,col="red",pch=19, cex=2)
+```
