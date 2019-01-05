@@ -1,3 +1,19 @@
+---
+title: "sum_of squareroot_error"
+author: "Srihari"
+date: "5 November 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(GenSA)
+library(GA)
+library(ggplot2)
+```
+
 #### SSE Using GA
 
 ```{r}
