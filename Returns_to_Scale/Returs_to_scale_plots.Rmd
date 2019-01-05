@@ -1,0 +1,111 @@
+---
+title: "Returs_to_scale_CRS,DRS,IRS,VRS,FDH,FRH"
+author: "srihari"
+date: "21 October 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Geetting library, input and output
+
+```{r}
+library(Benchmarking)
+library(ucminf)
+library(lpSolveAPI)
+inp<- matrix(c(150,400,320,520,350,320,0.2,0.7,1.2,2.0,1.2,0.7),ncol = 2)
+out <- matrix(c(14000,14000,42000,28000,19000,14000,3500,21000,10500,42000,25000,15000),ncol = 2)
+```
+
+### Displaying INPUT as inp and OUTPUT as out
+```{r}
+inp
+out
+colnames(inp) <- c("staff_HRS_Per_day","Supplies_Day")
+colnames(out) <- c("reimursed_p_day","private_p_day")
+```
+### DEA analysis of CRS
+```{r}
+crs<- dea(inp,out, RTS ='CRS')
+crs
+peers(crs)
+lambda(crs)
+```
+### Plotting CRS
+```{r}
+dea.plot.frontier(inp,out,RTS = 'crs',xlab = 'input', ylab ='output',main ='Input vs Output using CRS')
+```
+### DEA analysis of DRS
+```{r}
+drs<- dea(inp,out, RTS ='drs')
+drs
+peers(drs)
+lambda(drs)
+```
+### Plotting DRS
+```{r}
+dea.plot.frontier(inp,out,RTS = 'drs',xlab = 'input', ylab ='output',main ='Input vs Output using DRS')
+```
+### DEA analysis of IRS
+```{r}
+irs<-dea(inp,out, RTS ='irs')
+irs
+peers(irs)
+lambda(irs)
+```
+### Plotting IRS
+```{r}
+dea.plot.frontier(inp,out,RTS = 'irs',xlab = 'input', ylab ='output',main ='Input vs Output using IRS')
+```
+
+### DEA analysis of VRS
+```{r}
+vrs<-dea(inp,out, RTS ='vrs')
+vrs
+peers(vrs)
+lambda(vrs)
+```
+### Plotting VRS
+```{r}
+dea.plot.frontier(inp,out,RTS = 'vrs',xlab = 'input', ylab ='output',main ='Input vs Output using VRS')
+```
+### DEA analysis of FRH
+```{r}
+frh<- dea(inp,out, RTS ='add')
+frh
+peers(frh)
+lambda(frh)
+```
+### Plotting FDH/ADD
+
+```{r}
+fdh<-dea(inp,out, RTS ='fdh')
+fdh
+peers(fdh)
+lambda(fdh)
+```
+
+```{r}
+dea.plot.frontier(inp,out,RTS = 'fdh',xlab = 'input', ylab ='output',main ='Input vs Output using fdh')
+```
+
+
+dea.plot.frontier(inp,out,RTS = 'add',xlab = 'input', ylab ='output',main ='Input vs Output using frh')
+```
+```{r}
+```
+
+### Tabular view or results for CRS,DRS,IRS,VRS,FDH,FRH
+```{r}
+crs<- c(1.0000, 1.0000 ,1.0000, 1.0000, 0.9775, 0.8675)
+drs<- c(1.0000, 1.0000 ,1.0000, 1.0000, 0.9775, 0.8675)
+irs<- c(1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 0.8963)
+fdh<- c( 1 ,1 ,1 ,1 ,1 ,1)
+vrs<- c(1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 0.8963)
+frh<- c(1, 1, 1, 1, 1, 1)
+facility<-c('facility 1','facility 2','facility 3','facility 4','facility 5', 'facility 6')
+results<-data.frame(facility,crs,drs,fdh,irs,vrs,frh)
+results
+```
