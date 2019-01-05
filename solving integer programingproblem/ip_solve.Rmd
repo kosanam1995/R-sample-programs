@@ -22,7 +22,7 @@ x1 + x2 <= 6;
 
 ```{r}
 library(lpSolveAPI)
-x <- read.lp("oct8.n1.lp")
+x <- read.lp("n1.lp")
 ```
 
 
