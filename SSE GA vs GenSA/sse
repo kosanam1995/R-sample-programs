@@ -1,0 +1,78 @@
+#### SSE Using GA
+
+```{r}
+x=c(5, 6, 25, 21, 25,  2,  36, 11,  28, 19)
+y= c(12, 20,  8,  5,  6, 18,  35, 11,  44, 15)  
+m<-data.frame(x=c(5, 6, 25, 21, 25,  2,  36, 11,  28, 19),y= c(12, 20,  8,  5,  6, 18,  35, 11,  44, 15)  )
+plot(m)
+lm(m)
+abline(lm(m))
+
+
+obj <- function(a,b) {
+  sum((y-(a+b*x))^2)
+}
+
+obj1 <- function(z) {
+  -obj(z[1],z[2])
+}
+
+lower <- c(1,12)
+upper<- c(10,30)
+
+gam <- ga(type = "real-valued",fitness=obj1,lower=rep(0,2),upper=rep(1,2), popSize = 10,maxiter = 300)
+
+ summary(gam)
+ gam@solution
+
+
+```
+
+
+#### SSE Using GSA
+
+```{r}
+x=c(5, 6, 25, 21, 25,  2,  36, 11,  28, 19)
+y= c(12, 20,  8,  5,  6, 18,  35, 11,  44, 15)  
+
+plot(m)
+lm(m)
+abline(lm(m))
+
+
+obj <- function(a,b) {
+  sum((y-(a+b*x))^2)
+}
+
+obj1 <- function(z) {
+  obj(z[1],z[2])
+}
+
+lower <- c(1,12)
+upper<- c(10,30)
+
+Gensa <- GenSA(fn = obj1, lower = rep(0, 2), upper = rep(1, 2), control = list(smooth = FALSE, max.call = 300))
+
+p<-Gensa[c("value","par","counts")]
+
+p
+```
+####GA vs GenSA
+```{r}
+solution_ga <-c('0.004963127', '0.001132008')
+solution_Gensa <-c('0.9999996', '0.7853575')
+data.frame(solution_ga,solution_Gensa)
+
+print('Number of Itterations=3000')
+
+fitness_value_ga<-c('4490.2  ')
+fitness_value_Gensa<- c('1498.989 ') 
+data.frame(fitness_value_ga,fitness_value_Gensa)
+```
+```{r}
+
+ggplot(data=m,aes(x=x,y=y,text="X,Y Points"))+geom_point(aes(x,y,color="points"))+stat_smooth(formula =y~x, method=lm, se=F,aes( color="Regression"))+ geom_abline(aes(slope=0.9999996 ,intercept=0.7853575,color="GeneticAlgorithm" ))+geom_abline(aes(slope=1,intercept=0.7853196,color="Generalized Simulated Annealing"))+ggtitle("GA,SA,Regression")
+```
+
+
+
