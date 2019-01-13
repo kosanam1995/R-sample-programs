@@ -106,27 +106,27 @@ portfolio_returns_tq_rebalanced_monthly <-
   mutate(returns_above_MAR = ifelse(returns > MAR, returns, NA))
 
 })
-  output$plot1<- 
-    renderPlot({
-      
-      validate(need(input$go != 0,
-                    "Please choose your portfolio assets, weights, MAR, rolling window and start date and click submit."))
-      
-      MAR <- mar()
-      portfolio_returns_tq_rebalanced_monthly <- portfolio_returns_tq_rebalanced_monthly()
-      
-      print( portfolio_returns_tq_rebalanced_monthly %>%
-               ggplot(aes(x = date)) +
-               geom_point(aes(y = returns_below_MAR), colour = "red") +
-               geom_point(aes(y = as.single(returns_above_MAR)), colour = "green") + 
-               geom_vline(xintercept = as.numeric(as.Date("2016-11-30")), color = "blue") +
-               geom_hline(yintercept = MAR, color = "purple", linetype = "dotted") +
-               annotate(geom="text", x=as.Date("2016-11-30"), 
-                        y = -.15, label = "Election", fontface = "plain", 
-                        angle = 90, alpha = .5, vjust =  1.5) +
-               ylab("percent monthly returns")
-             
-      )})
+ output$plot1<- 
+renderPlot({
+
+  validate(need(input$go != 0,
+          "Please choose your portfolio assets, weights, MAR, rolling window and start date and click submit."))
+
+  MAR <- mar()
+  portfolio_returns_tq_rebalanced_monthly <- portfolio_returns_tq_rebalanced_monthly()
+
+ print( portfolio_returns_tq_rebalanced_monthly %>%
+  ggplot(aes(x = date)) +
+  geom_point(aes(y = returns_below_MAR), colour = "red") +
+  geom_point(aes(y = as.single(returns_above_MAR)), colour = "green") + 
+  geom_vline(xintercept = as.numeric(as.Date("2016-11-30")), color = "blue") +
+  geom_hline(yintercept = MAR, color = "purple", linetype = "dotted") +
+  annotate(geom="text", x=as.Date("2016-11-30"), 
+           y = -.15, label = "Election", fontface = "plain", 
+           angle = 90, alpha = .5, vjust =  1.5) +
+  ylab("percent monthly returns")
+
+)})
   
 
 output$plot2<-
