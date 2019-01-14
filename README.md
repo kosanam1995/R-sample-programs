@@ -84,7 +84,17 @@ Download and run the SSE.R file.
 The resulteant output will be in the form of table that compares GA AND GenSA
 
 
-## solving integer programingproblem
+## solving leniar programing problem
+
+we solve the following problem 
+
+max: 8 x1 + 5 x2;
+
+with constraints
+
+x1 + x2 <= 6;
+
+9 x1 + 5 x2 <= 45;
 
 ### Installation
 
@@ -92,7 +102,7 @@ install.packages("lpSolveAPI")
 
 ### Deployment
 
-Download both "n1.lp" and "ip_solve.Rmd" in to a single folder.
+Download both "n1.lp" and "lp_solve.Rmd" in to a single folder.
 
 Then run "ip_solve.Rmd"
 
