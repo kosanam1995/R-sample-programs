@@ -1,0 +1,309 @@
+---
+title: "Data Preparation & Cleaning"
+output: html_notebook
+---
+
+```{r library, warning=F, message=F}
+library(readxl)
+library(reshape2)
+library(dplyr)
+library(magrittr)
+library(tm)
+library(keras)
+library(caret)
+library(SnowballC)
+```
+
+## 1. Loading The Data
+
+```{r load-dataset, warning=F, message=F, echo = T, results = 'hide'}
+# Encode specific kinds of values as NA while reading excel
+# Treat all columns as character
+
+non_bill_df <- read_excel("data/december_non-bill_calls.xlsx", na = c("", "---"), col_types = "text")
+billed_df <- read_excel("data/december_billed_calls.xlsx", na = c("", "---"), col_types = "text")
+```
+
+We will combine `non_bill_df` and `billed_df` into a dataframe called `billing_df`.
+
+```{r}
+billing_df <- bind_rows(non_bill_df, billed_df)
+
+glimpse(billing_df)
+```
+
+Based on initial discussions and research into the meaning of some of the features in this dataset, we have categorized the following features as being not __important__.
+
+```{r, echo=FALSE}
+features_to_rm <- c(
+  "SR Number",
+  "SR Address Line 1",
+  "SR State",
+  "SR City",
+  "SR Site",
+  "SR Status",
+  "SR Contact Date",
+  "SR Coverage Hours...11",
+  "SR Coverage Hours...28",
+  "Activity Status",
+  "Charges Status",
+  "Br Area Desc",
+  "Base Call YN",
+  "Activity Facts Call Num",
+  "Activity Completed Date",
+  "Item Desc",
+  "SR Serial Number"
+)
+
+features_to_rm
+```
+
+> The features `SR Coverage Hours...11` and `SR Coverage Hours...28` were created by R because the excel contained two columns with the name `SR Coverage Hours`.
+
+The features have been stored in variable called `features_to_rm`, the next step is to remove these `r length(features_to_rm)` features from the `billing_df` dataset. This step reduces our number of features from __29 to 12__.
+
+```{r}
+billing_df <- billing_df %>% select(-features_to_rm)
+
+glimpse(billing_df)
+```
+
+## 2. Cleaning The Data
+
+### 2.1 Encoding The Variables as Factors
+
+We can notice that R has miss categorized some of the features in our dataset. There are certain features that are supposed to be read as categorical such as:
+
+```{r echo=FALSE}
+char_to_factors <- c(
+  "Invoiced (Y/N)",
+  "Activity Type",
+  "Activity Trouble Code",
+  "Coverage Type",
+  "SR Type",
+  "SR Device",
+  "SR Owner (Q#)",
+  "Br Branch Desc",
+  "Br Region Desc",
+  "Cash Vendor & Consumable Contracts"
+)
+
+char_to_factors
+```
+
+Lets encode the features in `char_to_factors` as factors
+
+```{r}
+billing_df <- billing_df %>% mutate_at(char_to_factors, factor)
+
+glimpse(billing_df)
+```
+
+### 2.2 Preprocessing Free Form Text
+
+The features in our dataset that are free form text are the features `Billing Notes` and `Call Text`.
+
+Below is a preview of `Call Text`
+
+```{r}
+billing_df$`Call Text` %>% head(3)
+```
+
+Below is a preview of `Billing Notes`
+
+```{r}
+billing_df$`Billing Notes` %>% extract(c(3, 5, 1))
+```
+
+```{r}
+call_text <-  use_series(billing_df, `Call Text`)
+billing_notes <-  use_series(billing_df, `Billing Notes`)
+```
+
+```{r}
+call_text_corpus <- VCorpus(VectorSource(call_text), readerControl = list(language = "en"))
+bill_notes_corpus <- VCorpus(VectorSource(billing_notes), readerControl = list(language = "en"))
+```
+
+```{r}
+call_text_corpus %>% extract(1:3) %>% inspect()
+```
+
+```{r}
+call_text_corpus %>% head(3) %>% lapply(function (doc) doc$content)
+```
+
+To clean our data set we will have to:
+
+* Convert the text to lower case, so that words like "write" and "Write" are considered the same word
+* Remove numbers
+* Remove English stopwords e.g "the", "is", "of", etc.
+* Remove punctuation e.g ",", "?", etc.
+* Eliminate extra white spaces
+* Stemming our text
+
+Using the `tm` package we will apply transformations to each text document in the `call_text_corpus` to clean the text document.
+
+```{r}
+replace_asterix <- function(document) {
+  gsub(pattern = "\\*", replacement = " ", document)
+}
+
+add_space_period <- function(document) {
+  gsub(pattern = "\\.", replacement = ". ", document)
+}
+
+remove_single_chars <- function(document) {
+  gsub(pattern = "\\s[a-z]\\s", replacement = " ", document)
+}
+
+clean_up <- function(corpus) {
+  corpus %>%
+    # Convert the text to lower case
+    tm_map(content_transformer(tolower)) %>%
+    # Replace asterics "*" with an empty space
+    tm_map(content_transformer(replace_asterix)) %>%
+    # Add a space after a period
+    tm_map(content_transformer(add_space_period)) %>%
+    # Remove numbers
+    tm_map(removeNumbers) %>%
+    # Remove english common stopwords
+    tm_map(removeWords, stopwords("english")) %>%
+    # Remove words related to time
+    tm_map(removeWords, c("pm", "am", "edt")) %>%
+    # Remove punctuations
+    tm_map(removePunctuation) %>%
+    # Remove orphaned letters
+    tm_map(content_transformer(remove_single_chars)) %>%
+    # Eliminate extra white spaces
+    tm_map(stripWhitespace) %>%
+    # strip trailing and leading whitespace
+    tm_map(content_transformer(trimws)) %>%
+    # Stem words
+    tm_map(stemDocument)
+}
+
+call_text_cleaned <- clean_up(call_text_corpus)
+bill_notes_cleaned <- clean_up(bill_notes_corpus)
+```
+
+```{r}
+call_text_cleaned  %>% lapply(function (doc) doc$content) %>% extract(1:5)
+```
+
+```{r}
+bill_notes_cleaned %>% lapply(function (doc) doc$content) %>% extract(1:5)
+```
+
+```{r}
+billing_df$`Call Text` <- call_text_cleaned %>% sapply(function (doc) doc$content)
+billing_df$`Billing Notes` <- bill_notes_cleaned %>% sapply(function (doc) doc$content)
+```
+
+## 3. Tokenization & Encoding
+
+```{r constants}
+CONSTANTS <- list(
+  # We will only consider the top MAX_WORDS in the dataset
+  MAX_WORDS = 20000,
+  # We will cut text after MAX_LEN
+  MAX_LEN = 200,
+  BATCH_SIZE_GPU = 256,
+  BATCH_SIZE_CPU = 128
+)
+```
+
+### 3.1 Encoding Categorical data
+
+We will start off by encoding the labels of `Invoiced (Y/N)` using the `to_categorical` from keras
+
+```{r}
+invoiced <- billing_df %>%
+  use_series("Invoiced (Y/N)") %>%
+  as.numeric() %>%
+  subtract(1) %>%
+  as.matrix()
+
+cat('Shape of label tensor:', dim(invoiced))
+```
+
+#### 3.1.1 One Hot Encoding The Categorical Variables
+
+```{r}
+categorical_vars <- billing_df %>%
+  select(char_to_factors[-1]) %>%
+  # Treat NAs as a factor
+  mutate_all(addNA)
+
+glimpse(categorical_vars)
+```
+
+```{r one-hot-encoding}
+dummy_model <- dummyVars(" ~ .", data = categorical_vars, fullRank = T)
+auxillaries <- data.matrix(predict(dummy_model, newdata = categorical_vars))
+
+cat('Shape of auxillary tensor:', dim(auxillaries), "\n")
+```
+
+### 3.2 Tokenizing Free Form Text
+
+We will tokenize each free form text: `Call Text` and `Billing Notes` separately.
+
+#### 3.2.1 Call Text
+
+We will start out by tokenizing `Call Text`:
+
+A `tokenizer` object will be created and configured to only take into account the top most common words, then builds the word index. We then turn the texts into lists of integer indices.
+
+```{r}
+call_text_df <- billing_df %>% select(c("Call Text"))
+
+call_text_tokenizer <- text_tokenizer(num_words = CONSTANTS$MAX_WORDS) %>%
+  fit_text_tokenizer(call_text_df$`Call Text`)
+
+call_text_sequences <- texts_to_sequences(call_text_tokenizer, call_text_df$`Call Text`)
+
+cat("Found", length(call_text_tokenizer$word_index), "unique tokens.\n")
+```
+
+```{r}
+call_text_data <- pad_sequences(call_text_sequences, maxlen = CONSTANTS$MAX_LEN)
+
+cat("Shape of data tensor:", dim(call_text_data), "\n")
+```
+
+#### 3.2.2 Billing Notes
+
+We then tokenize `Billing Notes`:
+
+```{r}
+billing_notes_df <- billing_df %>% select("Billing Notes")
+
+billing_notes_tokenizer <- text_tokenizer(num_words = CONSTANTS$MAX_WORDS) %>%
+  fit_text_tokenizer(billing_notes_df$`Billing Notes`)
+
+billing_notes_sequences <- texts_to_sequences(
+  billing_notes_tokenizer,
+  billing_notes_df$`Billing Notes`
+)
+
+cat("Found", length(billing_notes_tokenizer$word_index), "unique tokens.\n")
+```
+
+```{r}
+billing_notes_data <- pad_sequences(billing_notes_sequences, maxlen = CONSTANTS$MAX_LEN)
+
+cat("Shape of data tensor:", dim(billing_notes_data), "\n")
+```
+
+```{r}
+save(
+  CONSTANTS,
+  billing_df,
+  call_text_data,
+  billing_notes_data,
+  invoiced,
+  auxillaries,
+  file="data_preparation.RData"
+)
+```

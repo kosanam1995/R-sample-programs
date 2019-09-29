@@ -1,0 +1,239 @@
+---
+title: "Model Building v2"
+output: html_notebook
+---
+
+```{r setup, include=F}
+rm(list = ls())
+load("data_preparation.RMD")
+```
+
+```{r, message=FALSE}
+library(keras)
+library(dplyr)
+library(magrittr)
+library(caret)
+library(pROC)
+```
+
+## 1. Spliting Dataset into Training and Test
+
+```{r echo = F}
+set.seed(2019)
+
+train_index <- createDataPartition(
+  factor(invoiced),
+  p = 0.8,
+  list = F,
+  times = 1
+)
+```
+
+### 1.1 Splitting `Invoiced` into Training, Validation and Test
+
+```{r}
+set.seed(2019)
+
+val_index <- createDataPartition(
+  factor(invoiced[train_index, ]),
+  p = 0.2,
+  list = F,
+  times = 1
+)
+
+invoiced_train <- invoiced[train_index, ][-val_index] %>% as.array()
+invoiced_val <- invoiced[train_index, ][val_index] %>% as.array()
+invoiced_test <- invoiced[-train_index,] %>% as.array()
+
+cat(" Shape of Invoiced Train:", dim(invoiced_train), "\n",
+    "Shape of Invoiced Val:", dim(invoiced_val), "\n",
+    "Shape of Invoiced Test:", dim(invoiced_test))
+```
+
+```{r}
+print("--Distribution of Classes in Train--")
+print(as.factor(invoiced_train) %>% summary())
+print("--Distribution of Classes in Validation--")
+print(as.factor(invoiced_val) %>% summary())
+print("--Distribution of Classes in Test--")
+print(as.factor(invoiced_test) %>% summary())
+```
+
+### 1.2 Splitting `Call Text` into Training, Validation and Test
+
+```{r}
+call_text_train <- call_text_data[train_index,][-val_index,] %>% as.array()
+call_text_val <- call_text_data[train_index,][val_index,] %>% as.array()
+call_text_test <- call_text_data[-train_index,]
+
+cat(" Shape of Call Text Train:", dim(call_text_train), "\n",
+    "Shape of Call Text Val:", dim(call_text_val), "\n",
+    "Shape of Call Text Test:", dim(call_text_test))
+```
+
+### 1.2 Splitting `Billing Notes` into Training, Validation and Test
+
+```{r}
+billing_notes_train <- billing_notes_data[train_index,][-val_index,] %>% as.array()
+billing_notes_val <- billing_notes_data[train_index,][val_index,] %>% as.array()
+billing_notes_test <- billing_notes_data[-train_index,]
+
+cat(" Shape of Billing Notes Train:", dim(billing_notes_train), "\n",
+    "Shape of Billing Notes Val:", dim(billing_notes_val), "\n",
+    "Shape of Billing Notes Test:", dim(billing_notes_test))
+```
+
+### 1.3 Splitting `Auxilary` Data into Training, Validation and Test
+
+```{r}
+auxillaries_train <- auxillaries[train_index,][-val_index,] %>% as.array()
+auxillaries_val <- auxillaries[train_index,][val_index,] %>% as.array()
+auxillaries_test <- auxillaries[-train_index,]
+
+cat(" Shape of Auxillaries Train:", dim(auxillaries_train), "\n",
+    "Shape of Auxillaries Val:", dim(auxillaries_val), "\n",
+    "Shape of Auxillaries Test:", dim(auxillaries_test))
+```
+
+## 2. Merging Multiple Inputs
+
+### 2.1 Creating The Input Layers
+
+```{r}
+call_text_layer <- layer_input(
+  shape = c(CONSTANTS$MAX_LEN),
+  name = "call_text_layer"
+)
+
+billing_notes_layer <- layer_input(
+  shape = c(CONSTANTS$MAX_LEN),
+  name = "billing_notes_layer"
+)
+
+auxiliary_layer <- layer_input(shape = c(dim(auxillaries)[2]), name = 'auxiliary_layer')
+```
+
+### 2.2 Creating The Embedding layers
+
+```{r}
+call_text_embedding <- call_text_layer %>%
+  layer_embedding(
+    input_dim = CONSTANTS$MAX_WORDS,
+    output_dim = 512,
+    input_length = CONSTANTS$MAX_LEN,
+    name = "call_text_embedding") %>%
+  layer_dropout(0.6) %>%
+  layer_flatten()
+
+
+billing_notes_embedding <- billing_notes_layer %>%
+  layer_embedding(
+    input_dim = CONSTANTS$MAX_WORDS,
+    output_dim = 512,
+    input_length = CONSTANTS$MAX_LEN,
+    name = "billing_notes_embedding") %>%
+  layer_dropout(0.6) %>%
+  layer_flatten()
+```
+
+### 2.3 Merging Input and Auxilary Layers
+
+```{r}
+main_output <- layer_concatenate(c(call_text_embedding, billing_notes_embedding, auxiliary_layer)) %>%
+  layer_dense(units = 64, activation = 'relu', kernel_regularizer = regularizer_l2(l = 0.001)) %>%
+  layer_dense(units = 64, activation = 'relu', kernel_regularizer = regularizer_l2(l = 0.001)) %>%
+  layer_dense(units = 64, activation = 'relu', kernel_regularizer = regularizer_l2(l = 0.001)) %>%
+  layer_dense(units = 1, activation = 'sigmoid', name = 'main_output')
+```
+
+### 2.4 Building the Model
+
+```{r}
+model <- keras_model(
+  inputs = c(call_text_layer, billing_notes_layer, auxiliary_layer),
+  outputs = main_output
+)
+```
+
+```{r}
+model %>% compile(
+  optimizer = 'rmsprop',
+  loss = 'binary_crossentropy',
+  metric = c("accuracy")
+)
+
+summary(model)
+```
+
+```{r plot-model, eval = F}
+plot_model(model, show_shapes = T)
+```
+
+### 2.5 Training The Model
+
+```{r echo = T, results = 'hide'}
+history <- model %>% fit(
+  x = list(call_text_train, billing_notes_train, auxillaries_train),
+  y = invoiced_train,
+  epochs = 5,
+  batch_size = CONSTANTS$BATCH_SIZE_CPU,
+  validation_data = list(list(call_text_val, billing_notes_val, auxillaries_val), invoiced_val)
+)
+
+# save(history, file = "data/history_model_v2.RData")
+# save_model_hdf5(model, filepath = "data/fitted_model_v2")
+# save_model_weights_hdf5(model, filepath = "data/fitted_model_v2_weights")
+```
+
+```{r}
+plot(history,  method = c("ggplot2"))
+```
+
+### 2.6 Evaluating The Model
+
+```{r echo = T, results = 'hide'}
+model_result <- model %>%
+  evaluate(
+    list(call_text_test, billing_notes_test, auxillaries_test),
+    invoiced_test
+  )
+```
+
+```{r}
+cat('Test loss:', model_result$loss, "\n")
+cat('Test accuracy:', model_result$acc, "\n")
+```
+
+
+#### 2.6.1 Model's ROC & AUC
+
+```{r}
+pred_probs <- predict(model,
+    list(call_text_test, billing_notes_test, auxillaries_test),
+    batch_size = CONSTANTS$BATCH_SIZE_CPU
+  )
+
+dim(pred_probs)
+```
+
+```{r}
+roc_result <- roc(invoiced_test, as.vector(pred_probs))
+
+roc_result
+```
+
+```{r}
+plot(roc_result, col='red', lwd=2)
+```
+
+#### 2.6.2 Model's Confusion Matrix
+
+```{r}
+pred_class <- as.numeric(pred_probs > .25) %>% as.factor()
+
+confusionMatrix(
+  pred_class,
+  as.factor(invoiced_test),
+  mode = "prec_recall"
+)
+```

@@ -1,0 +1,302 @@
+---
+title: "Model Evaluation using The Test Data"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r library, warning=F, message=F}
+library(readxl)
+library(reshape2)
+library(dplyr)
+library(magrittr)
+library(tm)
+library(keras)
+library(caret)
+library(SnowballC)
+```
+
+## 1. Loading The Test Data
+
+```{r load-dataset, warning=F, message=F, echo = T, results = 'hide'}
+# Encode specific kinds of values as NA while reading excel
+# Treat all columns as character
+
+feb_test_df <- read.csv("february_test_dataset.csv", na = c("", "---"), col_types = "text")
+```
+
+### 1.1 Removing 
+
+```{r, echo=FALSE}
+features_to_rm <- c(
+  "SR.Number",
+  "SR.Address.Line.1",
+  "SR.State",
+  "SR.City",
+  "SR.Site",
+  "SR.Status",
+  "SR.Contact.Date",
+  "SR.Coverage.Hours",
+  "SR.Coverage.Hours.1",
+  "Activity.Status",
+  "Charges.Status",
+  "Br.Area.Desc",
+  "Base.Call.YN",
+  "Activity.Facts.Call.Num",
+  "Activity.Completed.Date",
+  "Item.Desc",
+  "SR.Serial.Number"
+)
+
+features_to_rm
+```
+
+```{r}
+feb_test_df <- feb_test_df %>% dplyr::select(-c(features_to_rm_test))
+
+glimpse(feb_test_df)
+```
+
+## 2. Cleaning The Data
+
+### 2.1 Encoding The Variables as Factors
+
+We can notice that R has miss categorized some of the features in our dataset. There are certain features that are supposed to be read as categorical such as:
+
+```{r echo=FALSE}
+char_to_factors <- c(
+ "ï..Invoiced..Y.N.",
+  "Activity.Type" ,
+ "Activity.Trouble.Code" ,
+ "Coverage.Type" ,
+"SR.Type" ,
+ "SR.Device",
+  "SR.Owner..Q.." ,
+  "Br.Branch.Desc",
+  "Br.Region.Desc",
+   "Cash.Vendor...Consumable.Contracts"
+)
+
+char_to_factors
+```
+
+Lets encode the features in `char_to_factors` as factors
+
+```{r}
+feb_test_df <- feb_test_df %>% mutate_at(char_to_factors_test, factor)
+
+glimpse(feb_test_df)
+```
+
+### 2.2 Preprocessing Free Form Text
+
+The features in our dataset that are free form text are the features `Billing.Notes` and `Call.Text`.
+
+Below is a preview of `Call.Text`
+
+```{r}
+feb_test_df$`Call.Text` %>% head(3)
+```
+
+Below is a preview of `Billing.Notes`
+
+```{r}
+feb_test_df$`Billing.Notes` %>% extract(c(3, 5, 1))
+```
+
+```{r}
+call_text_test <-  use_series(feb_test_df, `Call.Text`)
+billing_notes_test <-  use_series(feb_test_df, `Billing.Notes`)
+```
+
+```{r}
+call_text_corpus_test <- VCorpus(VectorSource(call_text_test), readerControl = list(language = "en"))
+bill_notes_corpus_test <- VCorpus(VectorSource(billing_notes_test), readerControl = list(language = "en"))
+```
+
+```{r}
+call_text_corpus_test %>% extract(1:3) %>% inspect()
+```
+
+```{r}
+call_text_corpus_test %>% head(3) %>% lapply(function (doc) doc$content)
+```
+
+To clean our data set we will have to: 
+
+* Convert the text to lower case, so that words like "write" and "Write" are considered the same word
+* Remove numbers
+* Remove English stopwords e.g "the", "is", "of", etc.
+* Remove punctuation e.g ",", "?", etc.
+* Eliminate extra white spaces
+* Stemming our text 
+
+Using the `tm` package we will apply transformations to each text document in the `call_text_corpus` to clean the text document.
+
+```{r}
+replace_asterix <- function(document) {
+  gsub(pattern = "\\*", replacement = " ", document)
+}
+
+add_space_period <- function(document) {
+  gsub(pattern = "\\.", replacement = ". ", document)
+}
+
+remove_single_chars <- function(document) {
+  gsub(pattern = "\\s[a-z]\\s", replacement = " ", document)
+}
+
+clean_up <- function(corpus) {
+  corpus %>% 
+    # Convert the text to lower case
+    tm_map(content_transformer(tolower)) %>%
+    # Replace asterics "*" with an empty space
+    tm_map(content_transformer(replace_asterix)) %>%
+    # Add a space after a period
+    tm_map(content_transformer(add_space_period)) %>%
+    # Remove numbers
+    tm_map(removeNumbers) %>%
+    # Remove english common stopwords
+    tm_map(removeWords, stopwords("english")) %>%
+    # Remove words related to time
+    tm_map(removeWords, c("pm", "am", "edt")) %>%
+    # Remove punctuations
+    tm_map(removePunctuation) %>%
+    # Remove orphaned letters
+    tm_map(content_transformer(remove_single_chars)) %>%
+    # Eliminate extra white spaces
+    tm_map(stripWhitespace) %>%
+    # strip trailing and leading whitespace
+    tm_map(content_transformer(trimws)) %>%
+    # Stem words
+    tm_map(stemDocument)
+}
+
+call_text_cleaned_test <- clean_up(call_text_corpus_test)
+bill_notes_cleaned_test <- clean_up(bill_notes_corpus_test)
+```
+
+
+```{r}
+call_text_cleaned_test  %>% lapply(function (doc) doc$content) %>% extract(1:5)
+```
+
+```{r}
+bill_notes_cleaned_test %>% lapply(function (doc) doc$content) %>% extract(1:5)
+```
+
+```{r}
+feb_test_df$`Call.Text` <- call_text_cleaned_test %>% sapply(function (doc) doc$content)
+feb_test_df$`Billing.Notes` <- bill_notes_cleaned_test %>% sapply(function (doc) doc$content)
+```
+
+## 3. Tokenization & Encoding
+
+```{r constants}
+CONSTANTS <- list(
+  # We will only consider the top MAX_WORDS in the dataset
+  MAX_WORDS = 20000,
+  # We will cut text after MAX_LEN
+  MAX_LEN = 200,
+  BATCH_SIZE_GPU = 256,
+  BATCH_SIZE_CPU = 128
+)
+```
+
+### 3.1 Encoding Categorical data
+
+
+
+#### 3.1.1 One Hot Encoding The Categorical Variables
+
+```{r}
+categorical_vars_test <- feb_test_df %>% 
+  dplyr::select(char_to_factors_test) %>%
+  # Treat NAs as a factor
+  mutate_all(addNA)
+
+glimpse(categorical_vars_test)
+```
+
+```{r one-hot-encoding}
+ 
+dummy_model_test <- dummyVars(" ~ .", data = categorical_vars_test, fullRank = T)
+auxillaries_feb_test <- data.matrix(predict(dummy_model_test, newdata = categorical_vars_test))
+padded_auxillaries <- cbind(auxillaries_feb_test, matrix(0, nrow = 108873, ncol = 29))
+cat('Shape of auxillary tensor:', dim(padded_auxillaries), "\n")
+```
+
+
+### 3.2 Tokenizing Free Form Text
+
+We will tokenize each free form text: `Call.Text` and `Billing.Notes` separately. 
+
+#### 3.2.1 Call.Text
+
+We will start out by tokenizing `Call.Text`:
+
+A `tokenizer` object will be created and configured to only take into account the top most common words, then builds the word index. We then turn the texts into lists of integer indices.
+
+```{r}
+call_text_test_df <- feb_test_df %>% dplyr::select(c("Call.Text"))
+
+call_text_tokenizer_test <- text_tokenizer(num_words = CONSTANTS$MAX_WORDS) %>% 
+  fit_text_tokenizer(call_text_test_df$`Call.Text`)
+
+call_text_sequences_test <- texts_to_sequences(call_text_tokenizer_test, call_text_test_df$`Call.Text`)
+```
+
+```{r}
+call_text_word_index_test <- call_text_tokenizer_test$word_index
+
+cat("Found", length(call_text_word_index_test), "unique tokens.\n")
+```
+
+```{r}
+call_text_test_data <- pad_sequences(call_text_sequences_test, maxlen = CONSTANTS$MAX_LEN)
+
+cat("Shape of data tensor:", dim(call_text_test_data), "\n")
+```
+
+#### 3.2.2 Billing.Notes
+
+We then tokenize `Billing.Notes`:
+
+```{r}
+billing_notes_test_df <- feb_test_df %>% dplyr::select("Billing.Notes")
+
+billing_notes_tokenizer_test <- text_tokenizer(num_words = CONSTANTS$MAX_WORDS) %>% 
+  fit_text_tokenizer(billing_notes_test_df$`Billing.Notes`)
+
+billing_notes_sequences_test <- texts_to_sequences(
+  billing_notes_tokenizer_test,
+  billing_notes_test_df$`Billing.Notes`
+)
+```
+
+```{r}
+billing_notes_word_index_test <- billing_notes_tokenizer_test$word_index
+
+cat("Found", length(billing_notes_word_index_test), "unique tokens.\n")
+```
+
+```{r}
+billing_notes_test_data <- pad_sequences(billing_notes_sequences_test, maxlen = CONSTANTS$MAX_LEN)
+
+cat("Shape of data tensor:", dim(billing_notes_test_data), "\n")
+```
+
+## 4. Training Model on February Test Data
+
+```{r}
+feb_pred_probs <- predict(model,
+    list(call_text_test_data, billing_notes_test_data, padded_auxillaries),
+    batch_size = CONSTANTS$BATCH_SIZE_CPU
+  )
+
+feb_pred_class <- as.numeric(feb_pred_probs >= .25) %>% as.factor() %>% as.data.frame()
+
+colnames(feb_pred_class) <- c("Invoiced (Y/N)")
+write.csv(feb_pred_class, file = "Prediction file.csv", row.names = F)
+```
+

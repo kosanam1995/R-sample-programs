@@ -1,0 +1,105 @@
+---
+title: "**Diebold Descriptive Analytics**"
+date: "February 23, 2019"
+output: html_document
+---
+
+##**Importing Data**
+```{r}
+diebold <- read.csv("december_non-bill_calls.csv", stringsAsFactors = FALSE)
+
+```
+
+##**Necessary Packages**
+```{r message=FALSE, warning=FALSE}
+library(qdap)
+library(dplyr)
+library(ggplot2)
+```
+
+##**Attribute Analysis**
+**Call Text**
+```{r}
+call_text <- diebold$Call.Text
+
+clean_call_text_reduced <- call_text %>%
+  tolower() %>%
+  removePunctuation() %>%
+  removeNumbers() %>%
+  stripWhitespace() %>%
+  removeWords(stopwords("en"))
+
+freq_terms_reduced <- freq_terms(clean_call_text_reduced)
+plot(freq_terms_reduced)
+freq_terms_reduced
+```
+
+**Billing Notes**
+```{r}
+billing_notes <- diebold$Billing.Notes
+
+clean_billing_notes_reduced <- billing_notes %>%
+  tolower() %>%
+  removePunctuation() %>%
+  removeNumbers() %>%
+  stripWhitespace() %>%
+  removeWords(stopwords("en"))
+
+freq_terms_reduced <- freq_terms(clean_billing_notes_reduced)
+plot(freq_terms_reduced)
+freq_terms_reduced
+```
+
+**Branch Description**
+```{r}
+br_branch_desc <- diebold$Br.Branch.Desc
+
+clean_br_branch_desc_reduced <- br_branch_desc %>%
+  tolower() %>%
+  removePunctuation() %>%
+  removeNumbers() %>%
+  stripWhitespace() %>%
+  removeWords(stopwords("en"))
+
+freq_terms_reduced <- freq_terms(clean_br_branch_desc_reduced)
+plot(freq_terms_reduced)
+freq_terms_reduced
+```
+
+**Item Description**
+```{r}
+item_desc <- diebold$Item.Desc
+
+clean_item_desc_reduced <- item_desc %>%
+  tolower() %>%
+  removePunctuation() %>%
+  removeNumbers() %>%
+  stripWhitespace() %>%
+  removeWords(stopwords("en"))
+
+freq_terms_reduced <- freq_terms(clean_item_desc_reduced)
+plot(freq_terms_reduced)
+freq_terms_reduced
+```
+
+**SR Duration**
+
+This was an attribute we created from the difference of SR Contact Date and Activity Completed Date to show total time that it took to complete each instance. 
+```{r}
+median(diebold$Difference)
+mean(diebold$Difference) 
+range(diebold$Difference)
+Diff.Count <- diebold %>%
+  group_by(Difference) %>%
+  summarize(Count = n())
+head(Diff.Count)
+```
+
+**Activity Type**
+```{r}
+diebold %>%
+  group_by(Activity.Type) %>%
+  summarize(Count = n()) %>%
+  arrange(desc(Count))
+```
+
